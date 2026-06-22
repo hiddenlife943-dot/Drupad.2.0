@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Notebook</title>
+    <link rel="icon" href="icon.png">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --primary: #38bdf8;
+            --danger: #ef4444;
+            --text: #f8fafc;
+            --text-light: #94a3b8;
+            --shadow: 0 8px 25px rgba(0,0,0,0.4);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        
+        body {
+            background: linear-gradient(135deg, #020617, #0f172a, #1e293b);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex; 
+            justify-content: center;
+        }
+
+        .container { width: 100%; max-width: 800px; padding: 20px; }
+        .hidden { display: none !important; }
+
+        /* Lock & Setup Screens */
+        .auth-screen {
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            height: 90vh; text-align: center;
+        }
+        
+        .auth-box,
+        .modal,
+        .note-card {
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .auth-box { 
+            padding: 40px; 
+            border-radius: 16px; 
+            box-shadow: var(--shadow); 
+            width: 100%;             max-width: 350px; 
+        }
+        .auth-box h2 { margin-bottom: 20px; color: var(--primary); }
+        
+        .auth-box input,
+        .modal input,
+        .modal textarea {
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            border: 1px solid #334155; 
+            border-radius: 8px; 
+            font-size: 16px;
+            background: #0f172a;
+            color: white;
+        }
+        .auth-box input { text-align: center; letter-spacing: 4px; }
+        
+        .auth-box input:focus,
+        .modal input:focus,
+        .modal textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .auth-box button { 
+            width: 100%; 
+            padding: 12px; 
+            background: var(--primary); 
+            color: #0f172a; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            cursor: pointer; 
+            margin-top: 10px; 
+            font-weight: bold; 
+        }
+        .auth-box button:hover { opacity: 0.9; }
+        .error-msg { color: var(--danger); font-size: 14px; margin-top: 10px; min-height: 20px; }
+        .reset-link { color: var(--text-light); font-size: 12px; margin-top: 20px; cursor: pointer; text-decoration: underline; }
+
+        /* Main App Header */
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        header h1 { 
+            font-size: 24px; 
+            color: var(--primary); 
+            text-shadow: 0 0 10px rgba(56,189,248,0.4);
+        }
+        
+        .lock-btn {             background: rgba(239,68,68,0.15);
+            border: 1px solid #ef4444; 
+            color: var(--danger); 
+            padding: 8px 16px; 
+            border-radius: 20px; 
+            cursor: pointer; 
+            font-weight: bold; 
+        }
+
+        /* Notes Grid */
+        .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        
+        .note-card { 
+            border-radius: 12px; 
+            box-shadow: var(--shadow); 
+            overflow: hidden; 
+            cursor: pointer; 
+            transition: all 0.3s ease; 
+            display: flex; 
+            flex-direction: column; 
+        }
+        .note-card:hover { 
+            transform: translateY(-8px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+        }
+        .note-card img { width: 100%; height: 150px; object-fit: cover; background: #020617; }
+        .note-card .content { padding: 15px; flex: 1; display: flex; flex-direction: column; }
+        .note-card h3 { margin-bottom: 8px; font-size: 18px; color: var(--text); }
+        .note-card p { color: var(--text-light); font-size: 14px; flex: 1; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+        .note-card .date { font-size: 12px; color: var(--text-light); margin-top: 10px; text-align: right; }
+        .note-card .delete-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 12px; margin-top: 5px; align-self: flex-end; }
+
+        /* FAB (Floating Action Button) */
+        .fab { 
+            position: fixed; 
+            bottom: 30px; 
+            right: 30px; 
+            width: 60px; 
+            height: 60px; 
+            background: linear-gradient(135deg, #38bdf8, #2563eb);
+            color: white; 
+            border: none; 
+            border-radius: 50%; 
+            font-size: 30px; 
+            box-shadow: 0 0 25px rgba(56,189,248,0.5);
+            cursor: pointer; 
+            z-index: 10; 
+        }
+
+        /* Modal / Editor */        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 100; }
+        .modal { 
+            width: 90%; 
+            max-width: 600px; 
+            max-height: 90vh; 
+            overflow-y: auto; 
+            border-radius: 16px; 
+            padding: 20px; 
+        }
+        .modal textarea { min-height: 200px; resize: vertical; font-family: inherit; }
+        .modal .actions { display: flex; gap: 10px; margin-top: 20px; }
+        .modal .actions button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-save { background: var(--primary); color: #0f172a; }
+        .btn-cancel { background: #334155; color: var(--text); }
+        
+        .image-preview { width: 100%; max-height: 200px; object-fit: contain; margin: 10px 0; border-radius: 8px; background: #020617; display: none; }
+        .file-label { display: block; padding: 12px; background: #334155; color: var(--text); text-align: center; border-radius: 8px; cursor: pointer; margin: 10px 0; }
+        .file-label:hover { background: #475569; }
+        #imageInput { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- SETUP SCREEN (First time only) -->
+    <div id="setupScreen" class="auth-screen hidden">
+        <div class="auth-box">
+            <h2>🔒 Create PIN</h2>
+            <p style="font-size: 14px; color: var(--text-light); margin-bottom: 15px;">Set a 4+ digit PIN to secure your notebook.</p>
+            <input type="password" id="newPin" placeholder="Enter PIN" maxlength="20">
+            <input type="password" id="confirmPin" placeholder="Confirm PIN" maxlength="20">
+            <button onclick="setupPIN()">Save & Lock</button>
+            <div id="setupError" class="error-msg"></div>
+        </div>
+    </div>
+
+    <!-- LOCK SCREEN -->
+    <div id="lockScreen" class="auth-screen hidden">
+        <div class="auth-box">
+            <h2>🔐 Secure Notebook</h2>
+            <input type="password" id="unlockPin" placeholder="Enter PIN" maxlength="20" onkeydown="if(event.key==='Enter')unlockApp()">
+            <button onclick="unlockApp()">Unlock</button>
+            <div id="unlockError" class="error-msg"></div>
+            <div class="reset-link" onclick="resetApp()">Forgot PIN? Reset App (Deletes Data)</div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="mainApp" class="container hidden">
+        <header>
+            <h1>📓 My Notebook</h1>            <button class="lock-btn" onclick="lockApp()">🔒 Lock</button>
+        </header>
+        <div id="notesGrid" class="notes-grid"></div>
+        <button class="fab" onclick="openEditor()">+</button>
+    </div>
+
+    <!-- EDITOR MODAL -->
+    <div id="editorModal" class="modal-overlay hidden">
+        <div class="modal">
+            <h2 id="editorTitle">New Note</h2>
+            <input type="text" id="noteTitle" placeholder="Note Title...">
+            <label class="file-label" for="imageInput">📷 Attach Image</label>
+            <input type="file" id="imageInput" accept="image/*" onchange="handleImage(event)">
+            <img id="imagePreview" class="image-preview">
+            <textarea id="noteContent" placeholder="Write your thoughts..."></textarea>
+            <div class="actions">
+                <button class="btn-cancel" onclick="closeEditor()">Cancel</button>
+                <button class="btn-save" onclick="saveNote()">Save Note</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- STATE & STORAGE ---
+        const STORAGE_KEYS = { PIN: 'nb_pin_hash', DATA: 'nb_data' };
+        let notes = [];
+        let currentEditId = null;
+        let currentImageData = null;
+
+        // --- SECURITY (SHA-256 Hashing) ---
+        async function hashPIN(pin) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(pin + "secure_salt_2026"); 
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // --- INITIALIZATION ---
+        async function init() {
+            const savedHash = localStorage.getItem(STORAGE_KEYS.PIN);
+            if (!savedHash) {
+                document.getElementById('setupScreen').classList.remove('hidden');
+            } else {
+                document.getElementById('lockScreen').classList.remove('hidden');
+            }
+        }
+
+        // --- AUTH FUNCTIONS ---
+        async function setupPIN() {            const pin = document.getElementById('newPin').value;
+            const confirm = document.getElementById('confirmPin').value;
+            const err = document.getElementById('setupError');
+            
+            if (pin.length < 4) return err.textContent = "PIN must be at least 4 characters.";
+            if (pin !== confirm) return err.textContent = "PINs do not match.";
+
+            const hash = await hashPIN(pin);
+            localStorage.setItem(STORAGE_KEYS.PIN, hash);
+            location.reload();
+        }
+
+        async function unlockApp() {
+            const pin = document.getElementById('unlockPin').value;
+            const savedHash = localStorage.getItem(STORAGE_KEYS.PIN);
+            const err = document.getElementById('unlockError');
+            
+            const hash = await hashPIN(pin);
+            if (hash === savedHash) {
+                document.getElementById('lockScreen').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                loadNotes();
+            } else {
+                err.textContent = "Incorrect PIN.";
+                document.getElementById('unlockPin').value = '';
+            }
+        }
+
+        function lockApp() {
+            document.getElementById('mainApp').classList.add('hidden');
+            document.getElementById('lockScreen').classList.remove('hidden');
+            document.getElementById('unlockPin').value = '';
+            document.getElementById('unlockError').textContent = '';
+        }
+
+        function resetApp() {
+            if(confirm("WARNING: This will permanently delete your PIN and ALL notes. Continue?")) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        // --- DATA FUNCTIONS ---
+        function loadNotes() {
+            const data = localStorage.getItem(STORAGE_KEYS.DATA);
+            notes = data ? JSON.parse(data) : [];
+            renderNotes();
+        }
+
+        function saveData() {            try {
+                localStorage.setItem(STORAGE_KEYS.DATA, JSON.stringify(notes));
+            } catch (e) {
+                alert("Storage full! Try deleting older notes or using smaller images.");
+            }
+        }
+
+        function renderNotes() {
+            const grid = document.getElementById('notesGrid');
+            grid.innerHTML = '';
+            
+            if(notes.length === 0) {
+                grid.innerHTML = '<p style="grid-column: 1/-1; text-align:center; color:var(--text-light); margin-top:50px;">No notes yet. Click + to create one.</p>';
+                return;
+            }
+
+            notes.sort((a, b) => b.date - a.date);
+
+            notes.forEach(note => {
+                const card = document.createElement('div');
+                card.className = 'note-card';
+                card.innerHTML = `
+                    ${note.image ? `<img src="${note.image}" alt="Note Image">` : ''}
+                    <div class="content">
+                        <h3>${note.title || 'Untitled'}</h3>
+                        <p>${note.content || ''}</p>
+                        <div class="date">${new Date(note.date).toLocaleDateString()}</div>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteNote(${note.id})">Delete</button>
+                    </div>
+                `;
+                card.onclick = () => openEditor(note.id);
+                grid.appendChild(card);
+            });
+        }
+
+        function deleteNote(id) {
+            if(confirm("Delete this note?")) {
+                notes = notes.filter(n => n.id !== id);
+                saveData();
+                renderNotes();
+            }
+        }
+
+        // --- EDITOR FUNCTIONS ---
+        function openEditor(id = null) {
+            currentEditId = id;
+            const modal = document.getElementById('editorModal');
+            modal.classList.remove('hidden');
+            
+            if (id) {                const note = notes.find(n => n.id === id);
+                document.getElementById('editorTitle').textContent = 'Edit Note';
+                document.getElementById('noteTitle').value = note.title;
+                document.getElementById('noteContent').value = note.content;
+                currentImageData = note.image;
+                if(note.image) {
+                    document.getElementById('imagePreview').src = note.image;
+                    document.getElementById('imagePreview').style.display = 'block';
+                }
+            } else {
+                document.getElementById('editorTitle').textContent = 'New Note';
+                document.getElementById('noteTitle').value = '';
+                document.getElementById('noteContent').value = '';
+                currentImageData = null;
+                document.getElementById('imagePreview').style.display = 'none';
+            }
+            document.getElementById('imageInput').value = '';
+        }
+
+        function closeEditor() {
+            document.getElementById('editorModal').classList.add('hidden');
+        }
+
+        function handleImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const MAX_DIM = 800; 
+                    
+                    if (width > height && width > MAX_DIM) {
+                        height *= MAX_DIM / width; width = MAX_DIM;
+                    } else if (height > MAX_DIM) {
+                        width *= MAX_DIM / height; height = MAX_DIM;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                    
+                    currentImageData = canvas.toDataURL('image/jpeg', 0.7); 
+                    document.getElementById('imagePreview').src = currentImageData;
+                    document.getElementById('imagePreview').style.display = 'block';
+                };                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function saveNote() {
+            const title = document.getElementById('noteTitle').value.trim();
+            const content = document.getElementById('noteContent').value.trim();
+
+            if (!title && !content && !currentImageData) {
+                alert("Please add a title, text, or image.");
+                return;
+            }
+
+            if (currentEditId) {
+                const note = notes.find(n => n.id === currentEditId);
+                note.title = title;
+                note.content = content;
+                note.image = currentImageData;
+            } else {
+                notes.push({
+                    id: Date.now(),
+                    title,
+                    content,
+                    image: currentImageData,
+                    date: Date.now()
+                });
+            }
+
+            saveData();
+            renderNotes();
+            closeEditor();
+        }
+
+        // Start App
+        init();
+    </script>
+</body>
+</html>
